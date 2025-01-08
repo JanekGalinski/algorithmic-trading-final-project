@@ -119,9 +119,9 @@ class AdvancedFeatureBasedStrategyWithStopLoss(bt.Strategy):
             return
 
         # Determine target class based on percentage change
-        if percent_change > 0.01:  
+        if percent_change > 0.02:  
             target_class = 1  # Gain
-        elif percent_change < -0.01: 
+        elif percent_change < -0.02: 
             target_class = -1  # Loss
         else:
             target_class = 0  # No significant change
@@ -141,8 +141,8 @@ class AdvancedFeatureBasedStrategyWithStopLoss(bt.Strategy):
             X_scaled = self.scaler.fit_transform(X)
 
             # Apply PCA
-            pca = PCA(n_components=min(self.pca_components, X_scaled.shape[1]))
-            pca_transformed = pca.fit_transform(X_scaled)
+            pca = PCA(n_components=self.pca_components)
+            X_pca = pca.fit_transform(X_scaled)
 
             # Hyperparameter tuning
             param_grid = {
@@ -153,11 +153,11 @@ class AdvancedFeatureBasedStrategyWithStopLoss(bt.Strategy):
             grid_search = GridSearchCV(
                 LogisticRegression(max_iter=self.lr_iterations), param_grid, cv=2
             )
-            grid_search.fit(X_scaled, y)
+            grid_search.fit(X_pca, y)
             self.lr_model = grid_search.best_estimator_
 
             # Predict for the next step
-            forecast = self.lr_model.predict([X_scaled[-1]])[0]
+            forecast = self.lr_model.predict([X_pca[-1]])[0]
 
             # Check trend alignment with SMA and ADX
             trend = fast_sma_value > slow_sma_value
@@ -322,16 +322,16 @@ def execute_backtest(strategy_class, strategy_args, stock_symbol, start_dt, end_
 
 def tune_strategy(strategy_class, stock_symbol, start_dt, end_dt):
     parameter_grid = {
-        "period_rsi": [14],
-        "fast_period_macd": [12],
-        "slow_period_macd": [20],
-        "signal_window_size": [500],
+        "period_rsi": [10, 14],
+        "fast_period_macd": [12, 15],
+        "slow_period_macd": [26, 30],
+        "signal_window_size": [200, 400],
         "stop_loss_threshold": [0.05],
-        "fast_sma_period": [5],
-        "slow_sma_period": [20],
+        "fast_sma_period": [5, 10],
+        "slow_sma_period": [10, 20],
         "pca_components": [2],
         "forecast_window": [25],
-        "take_profit_threshold": [0.01],
+        "take_profit_threshold": [0.02],
         "stochastic_period": [14]
     }
 
@@ -374,17 +374,17 @@ def tune_strategy(strategy_class, stock_symbol, start_dt, end_dt):
 def run_strategy_with_tuning():
     best_params = tune_strategy(
         strategy_class=AdvancedFeatureBasedStrategyWithStopLoss,
-        stock_symbol="AAPL",
-        start_dt="2022-01-01",
-        end_dt=datetime.datetime.today().strftime('%Y-%m-%d')
+        stock_symbol="^GSPC",
+        start_dt="2000-01-01",
+        end_dt="2002-01-01"
     )
 
     execute_backtest(
         strategy_class=AdvancedFeatureBasedStrategyWithStopLoss,
         strategy_args=best_params,
-        stock_symbol="AAPL",
-        start_dt="2022-01-01",
-        end_dt=datetime.datetime.today().strftime('%Y-%m-%d'),
+        stock_symbol="^GSPC",
+        start_dt="2000-01-01",
+        end_dt="2002-01-01",
         initial_funds=1000,
         trade_slippage=0.002,
         trade_commission=0.004,
