@@ -30,19 +30,32 @@ from itertools import product
 #-----------------------------------------------------------------------------------------------------------------------------
 
 class AdvancedFeatureBasedStrategyWithStopLoss(bt.Strategy):
-    def __init__(self, period_rsi, fast_period_macd, slow_period_macd, signal_window_size, stop_loss_threshold, pca_components=2, forecast_window=25, take_profit_threshold=0.05):
+    def __init__(self, period_rsi, fast_period_macd, slow_period_macd, signal_window_size, stop_loss_threshold, fast_sma_period=10, slow_sma_period=50, pca_components=2, forecast_window=25, take_profit_threshold=0.05, stochastic_period=14, williams_period=14, macro_volume_period=20, risk_per_trade=0.01):
         self.period_rsi = period_rsi
         self.fast_period_macd = fast_period_macd
         self.slow_period_macd = slow_period_macd
         self.signal_window_size = signal_window_size
         self.stop_loss_threshold = stop_loss_threshold
         self.take_profit_threshold = take_profit_threshold
+        self.fast_sma_period = fast_sma_period
+        self.slow_sma_period = slow_sma_period
         self.forecast_window = forecast_window
         self.pca_components = pca_components
+        self.stochastic_period = stochastic_period
+        self.williams_period = williams_period
+        self.macro_volume_period = macro_volume_period
+        self.risk_per_trade = risk_per_trade
 
         # Technical indicators
         self.rsi_indicator = bt.indicators.RSI(self.data.close, period=self.period_rsi)
         self.macd_indicator = bt.indicators.MACD(self.data.close, period_me1=self.fast_period_macd, period_me2=self.slow_period_macd)
+        self.sma_fast_indicator = bt.indicators.SimpleMovingAverage(self.data.close, period=self.fast_sma_period)
+        self.sma_slow_indicator = bt.indicators.SimpleMovingAverage(self.data.close, period=self.slow_sma_period)
+        self.stochastic_indicator = bt.indicators.Stochastic(self.data, period=self.stochastic_period)
+        self.williams_indicator = bt.indicators.WilliamsR(self.data, period=self.williams_period)
+        self.volume_sma_indicator = bt.indicators.SimpleMovingAverage(self.data.volume, period=self.macro_volume_period)
+        self.atr_indicator = bt.indicators.ATR(self.data, period=14)
+        self.adx_indicator = bt.indicators.ADX(self.data, period=14)
 
         # Logistic regression parameters
         self.lr_reg_strength = 1.0
@@ -80,6 +93,13 @@ class AdvancedFeatureBasedStrategyWithStopLoss(bt.Strategy):
         rsi_value = self.rsi_indicator[0]
         macd_value = self.macd_indicator.macd[0]
         macd_signal = self.macd_indicator.signal[0]
+        fast_sma_value = self.sma_fast_indicator[0]
+        slow_sma_value = self.sma_slow_indicator[0]
+        stochastic_value = self.stochastic_indicator[0]
+        williams_value = self.williams_indicator[0]
+        macro_volume_value = self.volume_sma_indicator[0]
+        atr_value = self.atr_indicator[0]
+        adx_value = self.adx_indicator[0]
 
         # Check for valid or non-zero closing price
         if pd.isna(self.data.close[0]) or self.data.close[0] == 0:
@@ -107,7 +127,7 @@ class AdvancedFeatureBasedStrategyWithStopLoss(bt.Strategy):
             target_class = 0  # No significant change
 
         # Collect feature values
-        feature_row = [rsi_value, macd_value, macd_signal]
+        feature_row = [rsi_value, macd_value, macd_signal, fast_sma_value, slow_sma_value, stochastic_value, williams_value, macro_volume_value, adx_value]
 
         self.feature_data.append(feature_row)  # Features
         self.target_data.append(target_class)  # Target
@@ -139,16 +159,21 @@ class AdvancedFeatureBasedStrategyWithStopLoss(bt.Strategy):
             # Predict for the next step
             forecast = self.lr_model.predict([X_scaled[-1]])[0]
 
-            if forecast == 1 and not self.position and len(self.broker.positions) < 10:  # Buy condition
-                self.initiate_buy()
-            elif forecast == -1 and not self.position and len(self.broker.positions) < 10:  # Sell condition
-                self.initiate_sell()
+            # Check trend alignment with SMA and ADX
+            trend = fast_sma_value > slow_sma_value
+            strong_trend = adx_value > 25
+
+            # Execute trades based on forecast, trend, and ADX
+            if forecast == 1 and trend and strong_trend and not self.position and len(self.broker.positions) < 10:  # Buy condition
+                self.initiate_buy(atr_value)
+            elif forecast == -1 and not trend and strong_trend and not self.position and len(self.broker.positions) < 10:  # Sell condition
+                self.initiate_sell(atr_value)
             elif forecast == 1 and self.position.size < 0:  # Close short position
                 self.close()
-                self.initiate_buy()
+                self.initiate_buy(atr_value)
             elif forecast == -1 and self.position.size > 0:  # Close long position
                 self.close()
-                self.initiate_sell()
+                self.initiate_sell(atr_value)
 
         # Check stop-loss, trailing stop, and take-profit conditions
         if self.position:
@@ -156,17 +181,23 @@ class AdvancedFeatureBasedStrategyWithStopLoss(bt.Strategy):
             self.evaluate_trailing_stop()
             self.evaluate_take_profit()
 
-    def initiate_buy(self):
+    def initiate_buy(self, atr_value):
         """Handle buy action."""
-        self.buy(size=1)
+        cash_available = self.broker.get_cash()
+        position_size = (cash_available * self.risk_per_trade) / atr_value
+        position_size = max(1, int(position_size))  # Ensure at least 1 share
+        self.buy(size=position_size)
         self.entry_price = self.data.close[0]
-        self.trailing_stop_price = self.entry_price * (1 - self.stop_loss_threshold)
+        self.trailing_stop_price = self.entry_price - atr_value
 
-    def initiate_sell(self):
+    def initiate_sell(self, atr_value):
         """Handle sell action."""
-        self.sell(size=1)
+        cash_available = self.broker.get_cash()
+        position_size = (cash_available * self.risk_per_trade) / atr_value
+        position_size = max(1, int(position_size))  # Ensure at least 1 share
+        self.sell(size=position_size)
         self.entry_price = self.data.close[0]
-        self.trailing_stop_price = self.entry_price * (1 + self.stop_loss_threshold)
+        self.trailing_stop_price = self.entry_price + atr_value
 
     def evaluate_stop_loss(self):
         """Close position if stop-loss is hit."""
@@ -179,13 +210,13 @@ class AdvancedFeatureBasedStrategyWithStopLoss(bt.Strategy):
     def evaluate_trailing_stop(self):
         """Adjust or trigger trailing stop."""
         if self.position.size > 0:  # Long position
-            new_trailing_stop = self.data.close[0] * (1 - self.stop_loss_threshold)
+            new_trailing_stop = self.data.close[0] - self.atr_indicator[0]
             if new_trailing_stop > self.trailing_stop_price:
                 self.trailing_stop_price = new_trailing_stop
             elif self.data.close[0] < self.trailing_stop_price:
                 self.close()
         elif self.position.size < 0:  # Short position
-            new_trailing_stop = self.data.close[0] * (1 + self.stop_loss_threshold)
+            new_trailing_stop = self.data.close[0] + self.atr_indicator[0]
             if new_trailing_stop < self.trailing_stop_price:
                 self.trailing_stop_price = new_trailing_stop
             elif self.data.close[0] > self.trailing_stop_price:
@@ -198,5 +229,90 @@ class AdvancedFeatureBasedStrategyWithStopLoss(bt.Strategy):
             if (self.position.size > 0 and self.data.close[0] >= take_profit_level) or \
                (self.position.size < 0 and self.data.close[0] <= take_profit_level):
                 self.close()
+
+
+# %%
+#-----------------------------------------------------------------------------------------------------------------------------
+# 3) Backtest
+#-----------------------------------------------------------------------------------------------------------------------------
+
+def execute_backtest(strategy_class, strategy_args, stock_symbol, start_dt, end_dt,
+                      initial_funds=1000, trade_slippage=0.002, trade_commission=0.004, allocation_percent=10, metrics_enabled=False, enable_plot=True):
+    # Initialize Backtrader engine
+    backtest_engine = bt.Cerebro()
+
+    # Fetch market data from Yahoo Finance
+    market_data = yf.download(stock_symbol, start=start_dt, end=end_dt)
+
+    # Clean and format data
+    if 'Adj Close' in market_data.columns:
+        market_data = market_data.drop(columns=['Adj Close'])
+
+    market_data.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+
+    # Save data (optional)
+    csv_name = f"{stock_symbol}_data.csv"
+    market_data.to_csv(csv_name)
+
+    # Verify data is in proper format
+    if not isinstance(market_data, pd.DataFrame):
+        raise ValueError(f"Expected a DataFrame, got: {type(market_data)}")
+
+    # Load data into Backtrader
+    data_feed = bt.feeds.PandasData(dataname=market_data)
+    backtest_engine.adddata(data_feed)
+
+    # Set initial capital
+    backtest_engine.broker.set_cash(initial_funds)
+
+    # Configure commission and slippage
+    backtest_engine.broker.setcommission(commission=trade_commission)
+    backtest_engine.broker.set_slippage_perc(trade_slippage)
+
+    # Configure position size
+    backtest_engine.addsizer(bt.sizers.PercentSizer, percents=allocation_percent)
+
+    # Print initial portfolio value
+    print(f"Starting Portfolio Value: {backtest_engine.broker.getvalue()}")
+
+    # Add the strategy with parameters
+    backtest_engine.addstrategy(strategy_class, **strategy_args)
+
+    if metrics_enabled:
+        # Add analyzers
+        backtest_engine.addanalyzer(bt.analyzers.SharpeRatio, riskfreerate=0.03)
+        backtest_engine.addanalyzer(bt.analyzers.DrawDown)
+        backtest_engine.addanalyzer(bt.analyzers.Transactions, _name="transactions")
+        backtest_engine.addanalyzer(bt.analyzers.TradeAnalyzer, _name="trade_analysis")
+
+    # Run backtest
+    results = backtest_engine.run()
+
+    # Print ending portfolio value
+    ending_value = backtest_engine.broker.getvalue()
+    print(f"Ending Portfolio Value: {ending_value}")
+
+    if metrics_enabled:
+        # Extract and print metrics
+        sharpe_ratio = results[0].analyzers.sharperatio.get_analysis()
+        drawdown = results[0].analyzers.drawdown.get_analysis()
+        transactions = results[0].analyzers.transactions.get_analysis()
+        trade_analysis = results[0].analyzers.trade_analysis.get_analysis()
+
+        print(f"Sharpe Ratio: {sharpe_ratio}")
+        print(f"Max Drawdown: {drawdown.max.drawdown}%")
+        print(f"Max Drawdown Duration: {drawdown.max.len} days")
+        print(f"Transactions: {transactions}")
+        print(f"Trade Analysis: {trade_analysis}")
+
+        # Calculate and print return rate
+        return_rate = ((ending_value - initial_funds) / initial_funds) * 100
+        print(f"Return Rate: {return_rate:.2f}%")
+
+    # Plot results
+    if enable_plot:
+        backtest_engine.plot()
+
+    return results
 
 # %%
