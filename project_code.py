@@ -26,7 +26,7 @@ from itertools import product
 
 # %%
 #-----------------------------------------------------------------------------------------------------------------------------
-# 2) Strategy definition class
+# 2) Strategy definition class with hyperparameters tuning
 #-----------------------------------------------------------------------------------------------------------------------------
 
 class AdvancedFeatureBasedStrategyWithStopLoss(bt.Strategy):
@@ -314,5 +314,89 @@ def execute_backtest(strategy_class, strategy_args, stock_symbol, start_dt, end_
         backtest_engine.plot()
 
     return results
+
+# %%
+#-----------------------------------------------------------------------------------------------------------------------------
+# 4) Strategy parameters with tuning
+#-----------------------------------------------------------------------------------------------------------------------------
+
+def tune_strategy(strategy_class, stock_symbol, start_dt, end_dt):
+    parameter_grid = {
+        "period_rsi": [14],
+        "fast_period_macd": [12],
+        "slow_period_macd": [20],
+        "signal_window_size": [500],
+        "stop_loss_threshold": [0.05],
+        "fast_sma_period": [5],
+        "slow_sma_period": [20],
+        "pca_components": [2],
+        "forecast_window": [25],
+        "take_profit_threshold": [0.01],
+        "stochastic_period": [14]
+    }
+
+    best_params = None
+    best_performance = -float('inf')
+
+    for params in product(*parameter_grid.values()):
+        param_dict = dict(zip(parameter_grid.keys(), params))
+        print(f"Testing parameters: {param_dict}")
+
+        results = execute_backtest(
+            strategy_class=strategy_class,
+            strategy_args=param_dict,
+            stock_symbol=stock_symbol,
+            start_dt=start_dt,
+            end_dt=end_dt,
+            initial_funds=1000,
+            trade_slippage=0.002,
+            trade_commission=0.004,
+            allocation_percent=10,
+            metrics_enabled=False,
+            enable_plot=False
+        )
+
+        final_value = results[0].broker.getvalue()
+        performance = final_value / 1000 - 1
+
+        if performance > best_performance:
+            best_performance = performance
+            best_params = param_dict
+
+    print(f"Best parameters: {best_params} with performance: {best_performance:.2f}")
+    return best_params
+
+# %%
+#-----------------------------------------------------------------------------------------------------------------------------
+# 5) Data details
+#-----------------------------------------------------------------------------------------------------------------------------
+
+def run_strategy_with_tuning():
+    best_params = tune_strategy(
+        strategy_class=AdvancedFeatureBasedStrategyWithStopLoss,
+        stock_symbol="AAPL",
+        start_dt="2022-01-01",
+        end_dt=datetime.datetime.today().strftime('%Y-%m-%d')
+    )
+
+    execute_backtest(
+        strategy_class=AdvancedFeatureBasedStrategyWithStopLoss,
+        strategy_args=best_params,
+        stock_symbol="AAPL",
+        start_dt="2022-01-01",
+        end_dt=datetime.datetime.today().strftime('%Y-%m-%d'),
+        initial_funds=1000,
+        trade_slippage=0.002,
+        trade_commission=0.004,
+        allocation_percent=10,
+        metrics_enabled=True
+    )
+
+# %%
+#-----------------------------------------------------------------------------------------------------------------------------
+# 6) Running strategy
+#-----------------------------------------------------------------------------------------------------------------------------
+
+run_strategy_with_tuning()
 
 # %%
