@@ -242,7 +242,7 @@ class AdvancedFeatureBasedStrategyWithStopLoss(bt.Strategy):
 #-----------------------------------------------------------------------------------------------------------------------------
 
 def execute_backtest(strategy_class, strategy_args, stock_symbol, start_dt, end_dt,
-                      initial_funds=100000, trade_slippage=0.002, trade_commission=0.004, allocation_percent=10, metrics_enabled=False, enable_plot=True):
+                      initial_funds=1000, trade_slippage=0.002, trade_commission=0.004, allocation_percent=10, metrics_enabled=False, enable_plot=True):
     # Initialize Backtrader engine
     backtest_engine = bt.Cerebro()
 
@@ -355,6 +355,7 @@ def tune_strategy(strategy_class, stock_symbol, start_dt, end_dt):
     best_params = None
     best_performance = -float('inf')
 
+    initial_funds = 1000
     for params in product(*parameter_grid.values()):
         param_dict = dict(zip(parameter_grid.keys(), params))
         print(f"Testing parameters: {param_dict}")
@@ -365,7 +366,7 @@ def tune_strategy(strategy_class, stock_symbol, start_dt, end_dt):
             stock_symbol=stock_symbol,
             start_dt=start_dt,
             end_dt=end_dt,
-            initial_funds=1000,
+            initial_funds=initial_funds,
             trade_slippage=0.002,
             trade_commission=0.004,
             allocation_percent=10,
@@ -374,7 +375,8 @@ def tune_strategy(strategy_class, stock_symbol, start_dt, end_dt):
         )
 
         final_value = results[0].broker.getvalue()
-        performance = (final_value - 100000) / 100000
+        # performance calculation
+        performance = (final_value - initial_funds) / initial_funds
 
         if performance > best_performance:
             best_performance = performance
@@ -402,7 +404,7 @@ def run_strategy_with_tuning():
         stock_symbol="^GSPC",
         start_dt="2000-01-01",
         end_dt="2002-01-01",
-        initial_funds=100000,
+        initial_funds=1000,
         trade_slippage=0.002,
         trade_commission=0.004,
         allocation_percent=10,
