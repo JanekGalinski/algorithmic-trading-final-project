@@ -28,6 +28,11 @@ from itertools import product
 #-----------------------------------------------------------------------------------------------------------------------------
 # 2) Strategy definition class with hyperparameters tuning
 #-----------------------------------------------------------------------------------------------------------------------------
+#Strategy description
+#This trading strategy, uses combination of technical indicators (RSI, MACD, SMA, Stochastic, Williams, ADX)
+#As well as logistic regression-based forecasting to make trading decisions
+#It also leverages machine learning techniques including: PCA for dimensionality reduction and hyperparameter tuning to optimize model performance
+#As a result it uses predictive analytics to classify market conditions (gains, losses, or neutral outcomes) and dynamically adjusts behavior 
 
 class AdvancedFeatureBasedStrategyWithStopLoss(bt.Strategy):
     def __init__(self, period_rsi, fast_period_macd, slow_period_macd, signal_window_size, stop_loss_threshold, fast_sma_period=10, slow_sma_period=50, pca_components=2, forecast_window=25, take_profit_threshold=0.05, stochastic_period=14, williams_period=14, macro_volume_period=20, risk_per_trade=0.01):
@@ -237,7 +242,7 @@ class AdvancedFeatureBasedStrategyWithStopLoss(bt.Strategy):
 #-----------------------------------------------------------------------------------------------------------------------------
 
 def execute_backtest(strategy_class, strategy_args, stock_symbol, start_dt, end_dt,
-                      initial_funds=1000, trade_slippage=0.002, trade_commission=0.004, allocation_percent=10, metrics_enabled=False, enable_plot=True):
+                      initial_funds=100000, trade_slippage=0.002, trade_commission=0.004, allocation_percent=10, metrics_enabled=False, enable_plot=True):
     # Initialize Backtrader engine
     backtest_engine = bt.Cerebro()
 
@@ -319,6 +324,18 @@ def execute_backtest(strategy_class, strategy_args, stock_symbol, start_dt, end_
 #-----------------------------------------------------------------------------------------------------------------------------
 # 4) Strategy parameters with tuning
 #-----------------------------------------------------------------------------------------------------------------------------
+#Thresholds justification
+#Stop Loss Threshold
+#A stop loss threshold of 5% (0.05) is chosen to limit potential losses on individual trades, this ensures risk management aligns with standard professional trading practices
+#It is commonly and wide used threshold which balances providing trades with enough breathing room and limiting downside risk
+
+#Take Profit Threshold
+#A 2% take profit threshold ensures that small but consistent gains are taken when strategy accurately forecasts positive trends
+#It also minimizes the risk of reversals eroding profits in volatile periods
+
+#Trailing Stop
+#In this strategy trailing stop threshold is dynamic - it adjusts based on the ATR (Average True Range) to secure gains while allowing to capitalize on favorable trends
+#It enables adapting to market volatility, avoiding too early exits or over-tight stops, which is aligned with modern risk-adjusted trading practices
 
 def tune_strategy(strategy_class, stock_symbol, start_dt, end_dt):
     parameter_grid = {
@@ -357,7 +374,7 @@ def tune_strategy(strategy_class, stock_symbol, start_dt, end_dt):
         )
 
         final_value = results[0].broker.getvalue()
-        performance = final_value / 1000 - 1
+        performance = (final_value - 100000) / 100000
 
         if performance > best_performance:
             best_performance = performance
@@ -385,7 +402,7 @@ def run_strategy_with_tuning():
         stock_symbol="^GSPC",
         start_dt="2000-01-01",
         end_dt="2002-01-01",
-        initial_funds=1000,
+        initial_funds=100000,
         trade_slippage=0.002,
         trade_commission=0.004,
         allocation_percent=10,
@@ -400,3 +417,22 @@ def run_strategy_with_tuning():
 run_strategy_with_tuning()
 
 # %%
+# %%
+#-----------------------------------------------------------------------------------------------------------------------------
+# 7) Final comments
+#-----------------------------------------------------------------------------------------------------------------------------
+
+#Justification of Strategy Effectiveness
+#Integration of multiple indicators (RSI for momentum, MACD for trend, ADX for trend strength) (momentum, trend, volatility, and volume indicators) creates a holistic market assessment, improving decision accuracy
+#Using trend strength (ADX) and aligning it with SMA crossovers ensures trades are executed in strong, favorable trends
+#Combination of trend-following and oscillating indicators reduces likelihood of false signals and is popular modern practice in trading strategies
+#Logistic regression introduces a predictive layer to strategy, enhancing ability to forecast market movements based on historical patterns
+#PCA simplifies complex data structures, improving model efficiency
+#Hyperparameter tuning ensures optimal performance across different market environments
+#Use of stop loss, take profit, and trailing stops mechanisms ensures that risk is effecitvely controlled, simulating real life scenarios
+#Tuning of strategy parameters ensures optimal performance across different market conditions, periods and asset classes
+
+#Limitations of strategy
+#Please note that due to limitations of used PC compute power - the hyperparameters of regression as well as strategy parameters tuning process is highly limited and cannot fully leverage all possible optimization opportunities
+#It is also worth to note that strategy has embedded preset factors algined with task requirements (slippage, commission threshold as well as basic trading rules)
+#As a result it might limit the generalizibity of findings
