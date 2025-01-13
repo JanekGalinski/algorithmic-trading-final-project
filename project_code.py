@@ -393,17 +393,17 @@ def tune_strategy(strategy_class, stock_symbol, start_dt, end_dt):
 def run_strategy_with_tuning():
     best_params = tune_strategy(
         strategy_class=AdvancedFeatureBasedStrategyWithStopLoss,
-        stock_symbol="^GSPC",
-        start_dt="2000-01-01",
-        end_dt="2002-01-01"
+        stock_symbol="AAPL",
+        start_dt="2005-01-01",
+        end_dt="2008-01-01"
     )
 
     execute_backtest(
         strategy_class=AdvancedFeatureBasedStrategyWithStopLoss,
         strategy_args=best_params,
-        stock_symbol="^GSPC",
-        start_dt="2000-01-01",
-        end_dt="2002-01-01",
+        stock_symbol="AAPL",
+        start_dt="2005-01-01",
+        end_dt="2008-01-01",
         initial_funds=1000,
         trade_slippage=0.002,
         trade_commission=0.004,
@@ -438,3 +438,41 @@ run_strategy_with_tuning()
 #Please note that due to limitations of used PC compute power - the hyperparameters of regression as well as strategy parameters tuning process is highly limited and cannot fully leverage all possible optimization opportunities
 #It is also worth to note that strategy has embedded preset factors algined with task requirements (slippage, commission threshold as well as basic trading rules)
 #As a result it might limit the generalizibity of findings
+
+#Strategy testing results and findings
+#Portfolio performs reasonably well in different market conditions, time periods and with use of different assets, including:
+
+#Index
+#^GSPC - S&P 500 Index
+#January 2000- January 2002 (2 years)
+#Sharpe Ratio: 0.36
+#Max Drawdown: 3.6%
+#Return Rate: 10.07%
+
+#Commodity Future
+#GC=F Gold Future
+#January 2009 - January 2012 (3 years)
+#Sharpe Ratio: 0.21
+#Max Drawdown: 6.7%
+#Return Rate: 14.56%
+
+#Individual stock
+#AAPL - Apple Stock
+#January 2005 - January 2008 (3 years)
+#Sharpe Ratio: 0.36
+#Max Drawdown: 6.41%
+#Return Rate: 19.79%
+
+#ETF
+#VONG - Vanguard Russell 1000 Growth Index Fund ETF Shares
+#January 2019 - January 2021 (2 years)
+#Sharpe Ratio: 0.7
+#Max Drawdown: 6.21%
+#Return Rate: 21.82%
+
+#Across different timeperiods and different assets, strategy keeps positive Sharpe Ratios in the range of 0.21 and 0.7
+#It indicates that trades using this strategy provide returns above the given risk-free rate 
+#What is more the Max Drawdowns vary between 3.6% and 6.7% suggesting that there are no very risky trades resulting in very big losses in this strategy
+#Finally the Return Rates are between 10.07% to 21.82%
+#Looking at Sharpe Ratios, the best performance looks to be noted at ETF case and the worst in case of Commodity Future
+#It is worth to mention that similarly to parameters tuning, testing of strategy has certain limitations stemming from used PC compute power, limiting generalizibity of findings
