@@ -23,6 +23,10 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV
 from itertools import product
+import warnings
+
+# Ignore warnings
+warnings.filterwarnings("ignore")
 
 # %%
 #-----------------------------------------------------------------------------------------------------------------------------
@@ -247,17 +251,22 @@ def execute_backtest(strategy_class, strategy_args, stock_symbol, start_dt, end_
     backtest_engine = bt.Cerebro()
 
     # Fetch market data from Yahoo Finance
-    market_data = yf.download(stock_symbol, start=start_dt, end=end_dt)
+    csv_name = f"{stock_symbol}.csv"
+    market_data = pd.read_csv(csv_name, index_col=0, parse_dates=True)
 
-    # Clean and format data
+    # If "Adj Close" exists, drop it
     if 'Adj Close' in market_data.columns:
-        market_data = market_data.drop(columns=['Adj Close'])
+        market_data.drop(columns=['Adj Close'], inplace=True)
 
-    market_data.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+    # Rename columns to match expected names
+    market_data.rename(columns={'Max': 'High', 'Min': 'Low'}, inplace=True)
 
-    # Save data (optional)
-    csv_name = f"{stock_symbol}_data.csv"
-    market_data.to_csv(csv_name)
+    # If Volume does not exist
+    if 'Volume' not in market_data.columns:
+        market_data['Volume'] = 0
+
+    # Ensure final columns match the sequence expected
+    market_data = market_data[['Open', 'High', 'Low', 'Close', 'Volume']]
 
     # Verify data is in proper format
     if not isinstance(market_data, pd.DataFrame):
@@ -389,21 +398,42 @@ def tune_strategy(strategy_class, stock_symbol, start_dt, end_dt):
 #-----------------------------------------------------------------------------------------------------------------------------
 # 5) Data details
 #-----------------------------------------------------------------------------------------------------------------------------
+#Choose particular asset
+#usdjpy_w
+#1990-01-07
+#2009-03-01
+
+#btc_v_w
+#2010-07-18
+#2025-02-02
+
+#ge_us_m
+#1962-01-31
+#2025-01-31
+
+#wig20_w
+#2005-12-11
+#2025-02-02
+
+#zw=f_copper
+#2000-07-17
+#2019-09-02
+
 
 def run_strategy_with_tuning():
     best_params = tune_strategy(
         strategy_class=AdvancedFeatureBasedStrategyWithStopLoss,
-        stock_symbol="AAPL",
-        start_dt="2005-01-01",
-        end_dt="2008-01-01"
+        stock_symbol="wig20_w",
+        start_dt="2005-12-11",
+        end_dt="2025-02-02"
     )
 
     execute_backtest(
         strategy_class=AdvancedFeatureBasedStrategyWithStopLoss,
         strategy_args=best_params,
-        stock_symbol="AAPL",
-        start_dt="2005-01-01",
-        end_dt="2008-01-01",
+        stock_symbol="wig20_w",
+        start_dt="2005-12-11",
+        end_dt="2025-02-02",
         initial_funds=1000,
         trade_slippage=0.002,
         trade_commission=0.004,
@@ -421,7 +451,7 @@ run_strategy_with_tuning()
 # %%
 # %%
 #-----------------------------------------------------------------------------------------------------------------------------
-# 7) Final comments
+# 7) Testing comments
 #-----------------------------------------------------------------------------------------------------------------------------
 
 #Justification of Strategy Effectiveness
@@ -476,3 +506,43 @@ run_strategy_with_tuning()
 #Finally the Return Rates are between 10.07% to 21.82%
 #Looking at Sharpe Ratios, the best performance looks to be noted at ETF case and the worst in case of Commodity Future
 #It is worth to mention that similarly to parameters tuning, testing of strategy has certain limitations stemming from used PC compute power, limiting generalizibity of findings
+
+# %%
+#-----------------------------------------------------------------------------------------------------------------------------
+# 8) Final results
+#-----------------------------------------------------------------------------------------------------------------------------
+
+#usdjpy_w
+#1990-01-07
+#2009-03-01
+#Sharpe Ratio: -3.34
+#Max Drawdown: 6.29%
+#Return Rate: 0.32%
+
+#btc_v_w
+#2010-07-18
+#2025-02-02
+#Sharpe Ratio: 0.35
+#Max Drawdown: 101.05%
+#Return Rate: 832.86%
+
+#ge_us_m
+#1962-01-31
+#2025-01-31
+#Sharpe Ratio: -1.61
+#Max Drawdown: 6.701992144960003%
+#Return Rate: 29.61%
+
+#wig20_w
+#2005-12-11
+#2025-02-02
+#Sharpe Ratio: -0.04
+#Max Drawdown: 15.64%
+#Return Rate: 54.13%
+
+#zw=f_copper
+#2000-07-17
+#2019-09-02
+#Sharpe Ratio: -0.48
+#Max Drawdown: 31.49%
+#Return Rate: -4.33%
