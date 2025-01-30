@@ -518,6 +518,7 @@ run_strategy_with_tuning()
 #Sharpe Ratio: -3.34
 #Max Drawdown: 6.29%
 #Return Rate: 0.32%
+#Negative Sharpe indicates poor risk-adjusted performance, but drawdown is low. Overall returns are small but positive
 
 #btc_v_w
 #2010-07-18
@@ -525,6 +526,7 @@ run_strategy_with_tuning()
 #Sharpe Ratio: 0.35
 #Max Drawdown: 101.05%
 #Return Rate: 832.86%
+#Positive Sharpe and extremely high returns, but the strategy experiences massive drawdowns probably due to volatility of this asset
 
 #ge_us_m
 #1962-01-31
@@ -532,6 +534,7 @@ run_strategy_with_tuning()
 #Sharpe Ratio: -1.61
 #Max Drawdown: 6.701992144960003%
 #Return Rate: 29.61%
+#Negative Sharpe indicates poor risk-adjusted performance. However, drawdown is relatively small and the absolute return is positive, especially taking into account long time period
 
 #wig20_w
 #2005-12-11
@@ -539,6 +542,7 @@ run_strategy_with_tuning()
 #Sharpe Ratio: -0.04
 #Max Drawdown: 15.64%
 #Return Rate: 54.13%
+#The near-zero Sharpe shows minimal risk-adjusted gains, but the absolute return is very high. Drawdown is moderate
 
 #zw=f_copper
 #2000-07-17
@@ -546,3 +550,11 @@ run_strategy_with_tuning()
 #Sharpe Ratio: -0.48
 #Max Drawdown: 31.49%
 #Return Rate: -4.33%
+#Negative Sharpe and a substantial drawdown suggest the strategy struggled, ending with a net loss
+
+#To summarize across all assets, the strategy demonstrates mixed performance
+#Bitcoin shows the most extreme combination of high return and high drawdown
+#Currencies and equities (USD/JPY, GE, WIG20) tend to have lower drawdowns but also lower risk-adjusted returns
+#Copper stands out for both a negative Sharpe and negative overall return, indicating particularly poor performance in that market
+#By looking at Sharpe ratio in 4/5 cases it is negative, indicating strategy did not performed very well when looking at risk-adjusted performance
+#At the same time in 4/5 strategy provided relatively strong returns
